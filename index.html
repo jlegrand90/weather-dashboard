@@ -637,22 +637,24 @@
     }
 
     async function fetchWeather(lat, lon) {
+      console.log("Fetching weather for:", lat, lon);
       try {
-        const [weatherResponse, aqiData] = await Promise.all([
-          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`),
-          fetchAirQuality(lat, lon)
-        ]);
-        
-        const data = await weatherResponse.json();
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`);
+        console.log("Weather API response:", response.status);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        console.log("Weather data received:", data);
         currentWeatherData = data;
-        
         renderForecast(data);
         renderCurrent(data.current);
         renderSunMoon(data.daily);
-        renderSummary(data, aqiData);
+        renderSummary(data, null);
         fetchNOAAAlerts(lat, lon);
       } catch (error) {
-        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load forecast. API may be blocked by browser security. Try reloading or check console.</div>';
+        console.error("Weather fetch error:", error);
+        document.getElementById("currentConditions").innerHTML = `<div class="error">API Error: ${error.message}. Check console for details.</div>`;
+        document.getElementById("dailyForecast").innerHTML = `<div class="error">Failed to load. Try entering a city name manually.</div>`;
+        document.getElementById("hourlyForecast").innerHTML = `<div class="error">Failed to load.</div>`;
       }
     }
 
