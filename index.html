@@ -652,7 +652,7 @@
         renderSummary(data, aqiData);
         fetchNOAAAlerts(lat, lon);
       } catch (error) {
-        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load forecast. Please try again.</div>';
+        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load forecast. API may be blocked by browser security. Try reloading or check console.</div>';
       }
     }
 
