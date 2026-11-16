@@ -9,12 +9,12 @@
 
 | Item | Path |
 |------|------|
-| Local working copy | `/Users/Josh/Documents/OS/Weather-Radar/index.html` |
 | GitHub repo (live) | `/Users/Josh/Documents/OS/weather-dashboard/index.html` |
 | GitHub remote | `git@github.com:jlegrand90/weather-dashboard.git` |
 | GitHub Pages URL | `https://jlegrand90.github.io/weather-dashboard/` |
+| Project log | `/Users/Josh/Documents/OS/weather-dashboard/PROJECT-LOG.md` |
 
-**Important**: Always edit the `weather-dashboard/` copy and push to GitHub. The `Weather-Radar/` folder is an outdated duplicate.
+**Note**: The old `Weather-Radar/` duplicate folder was deleted on 2026-11-15. `weather-dashboard/` is the only copy.
 
 ---
 
