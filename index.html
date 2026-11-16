@@ -378,6 +378,125 @@
       font-size: 16px;
       margin-right: 8px;
     }
+
+    /* ===== MOBILE RESPONSIVE (iPhone 12 and similar) ===== */
+    @media screen and (max-width: 768px) {
+      header {
+        padding: 14px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      .location {
+        font-size: 12px;
+      }
+      .location-selector {
+        width: 100%;
+      }
+      .location-selector input {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+      }
+      .container {
+        padding: 14px 12px;
+      }
+      .section {
+        border-radius: 10px;
+        margin-bottom: 16px;
+      }
+      .section-header {
+        padding: 12px 14px;
+      }
+      .section-title {
+        font-size: 16px;
+      }
+      .section-subtitle {
+        font-size: 12px;
+      }
+      .radar-container {
+        height: 320px;
+      }
+      .radar-controls {
+        padding: 8px 12px;
+        gap: 6px;
+      }
+      .radar-controls button {
+        padding: 5px 10px;
+        font-size: 12px;
+        flex: 1;
+        min-width: 0;
+      }
+      .forecast-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 12px;
+      }
+      .forecast-day {
+        padding: 10px 6px;
+      }
+      .weather-icon {
+        font-size: 26px;
+      }
+      .high {
+        font-size: 16px;
+      }
+      .low {
+        font-size: 12px;
+      }
+      .day-name {
+        font-size: 12px;
+      }
+      .day-date {
+        font-size: 10px;
+      }
+      .hourly-container {
+        padding: 12px;
+      }
+      .hour-item {
+        min-width: 60px;
+        padding: 10px 8px;
+      }
+      .current-conditions {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 12px;
+      }
+      .condition-card {
+        padding: 12px 8px;
+      }
+      .condition-value {
+        font-size: 17px;
+      }
+      .sun-moon {
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+      }
+      .sun-moon-item {
+        padding: 10px 14px;
+      }
+      .summary-table th,
+      .summary-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+      }
+      .last-updated {
+        text-align: center;
+      }
+    }
+
+    @media screen and (max-width: 480px) {
+      .forecast-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .radar-container {
+        height: 280px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -414,7 +533,9 @@
         </div>
       </div>
       <div class="radar-container">
-        <iframe id="radarFrame" src=""></iframe>
+        <div id="radarPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#7a8a6a;font-size:14px;">
+          Loading radar...
+        </div>
       </div>
       <div class="radar-controls">
         <button onclick="setRadarOverlay('radar')" class="active" id="btn-radar">Precipitation</button>
@@ -637,24 +758,22 @@
     }
 
     async function fetchWeather(lat, lon) {
-      console.log("Fetching weather for:", lat, lon);
       try {
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`);
-        console.log("Weather API response:", response.status);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        console.log("Weather data received:", data);
+        const [weatherResponse, aqiData] = await Promise.all([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`),
+          fetchAirQuality(lat, lon)
+        ]);
+        
+        const data = await weatherResponse.json();
         currentWeatherData = data;
+        
         renderForecast(data);
         renderCurrent(data.current);
         renderSunMoon(data.daily);
-        renderSummary(data, null);
+        renderSummary(data, aqiData);
         fetchNOAAAlerts(lat, lon);
       } catch (error) {
-        console.error("Weather fetch error:", error);
-        document.getElementById("currentConditions").innerHTML = `<div class="error">API Error: ${error.message}. Check console for details.</div>`;
-        document.getElementById("dailyForecast").innerHTML = `<div class="error">Failed to load. Try entering a city name manually.</div>`;
-        document.getElementById("hourlyForecast").innerHTML = `<div class="error">Failed to load.</div>`;
+        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load forecast. Please try again.</div>';
       }
     }
 
@@ -948,7 +1067,31 @@
         'pressure': 'pressure'
       };
 
-      document.getElementById('radarFrame').src = `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&zoom=6&overlay=${overlayMap[type]}&level=surface&lat=${currentLat}&lon=${currentLon}`;
+      const overlay = overlayMap[type];
+      const container = document.querySelector('.radar-container');
+      
+      // Remove placeholder if it exists
+      const placeholder = document.getElementById('radarPlaceholder');
+      if (placeholder) {
+        placeholder.remove();
+      }
+      
+      // Remove existing iframe if present
+      const existingIframe = document.getElementById('radarFrame');
+      if (existingIframe) {
+        existingIframe.remove();
+      }
+      
+      // Create fresh iframe — this forces mobile Safari to render it
+      const iframe = document.createElement('iframe');
+      iframe.id = 'radarFrame';
+      iframe.frameBorder = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.src = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&zoom=6&overlay=' + overlay + '&level=surface&lat=' + currentLat + '&lon=' + currentLon;
+      
+      container.appendChild(iframe);
     }
 
     async function updateLocation() {
@@ -983,6 +1126,8 @@
     }
 
     function getUserLocation() {
+      // Radar is already loaded via HTML src attribute
+      // fetchWeather runs regardless of geolocation outcome
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -990,20 +1135,51 @@
             currentLon = position.coords.longitude;
             document.getElementById('locationDisplay').textContent = 'Current Location';
             document.getElementById('cityInput').value = '';
+            // Re-set radar to new location
             setRadarOverlay('radar');
             fetchWeather(currentLat, currentLon);
           },
           () => {
+            // Geolocation denied — radar already showing default location
+            // Just fetch weather for default location
             fetchWeather(currentLat, currentLon);
           }
         );
       } else {
+        // No geolocation support — radar already showing
         fetchWeather(currentLat, currentLon);
       }
     }
 
-    // Init
+    // Init — run immediately since script is at end of body
     document.getElementById('locationDisplay').textContent = currentCity;
+    
+    // Mobile Safari local file iframe fix: simulate button press after delay
+    // This tricks the browser into treating it as a user-initiated action
+    function initRadar() {
+      const btn = document.getElementById('btn-radar');
+      if (btn) {
+        // Create and dispatch a synthetic click event
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        });
+        btn.dispatchEvent(clickEvent);
+      }
+    }
+    
+    // Try multiple times with increasing delays
+    setTimeout(initRadar, 500);
+    setTimeout(initRadar, 1500);
+    setTimeout(initRadar, 3000);
+    
+    // Also try when user first touches the screen
+    document.addEventListener('touchstart', function onFirstTouch() {
+      initRadar();
+      document.removeEventListener('touchstart', onFirstTouch);
+    }, { once: true });
+    
     getUserLocation();
 
     document.getElementById('cityInput').addEventListener('keypress', function(e) {
