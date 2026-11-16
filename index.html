@@ -533,8 +533,9 @@
         </div>
       </div>
       <div class="radar-container">
-        <div id="radarPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#7a8a6a;font-size:14px;">
-          Loading radar...
+        <div id="radarPlaceholder" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#7a8a6a;font-size:14px;gap:10px;">
+          <div>Loading radar...</div>
+          <div style="font-size:12px;color:#b8956a;">If radar doesn't appear, tap a button below</div>
         </div>
       </div>
       <div class="radar-controls">
@@ -758,11 +759,23 @@
     }
 
     async function fetchWeather(lat, lon) {
+      // Set a timeout so we don't wait forever
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out')), 15000);
+      });
+      
       try {
-        const [weatherResponse, aqiData] = await Promise.all([
-          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`),
-          fetchAirQuality(lat, lon)
+        const [weatherResponse, aqiData] = await Promise.race([
+          Promise.all([
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset,precipitation_sum&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m,relative_humidity_2m,apparent_temperature,uv_index,visibility,dew_point_2m&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,uv_index,precipitation,rain,showers,visibility,dew_point_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=8`),
+            fetchAirQuality(lat, lon)
+          ]),
+          timeoutPromise
         ]);
+        
+        if (!weatherResponse.ok) {
+          throw new Error('Weather API returned ' + weatherResponse.status);
+        }
         
         const data = await weatherResponse.json();
         currentWeatherData = data;
@@ -773,7 +786,12 @@
         renderSummary(data, aqiData);
         fetchNOAAAlerts(lat, lon);
       } catch (error) {
-        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load forecast. Please try again.</div>';
+        console.error('fetchWeather error:', error);
+        document.getElementById('dailyForecast').innerHTML = '<div class="error">Failed to load. Tap Refresh.</div>';
+        document.getElementById('currentConditions').innerHTML = '<div class="error">Failed to load. Tap Refresh.</div>';
+        document.getElementById('hourlyForecast').innerHTML = '<div class="error">Failed to load. Tap Refresh.</div>';
+        document.getElementById('sunMoon').innerHTML = '<div class="error">Failed to load. Tap Refresh.</div>';
+        document.getElementById('conditionsSummary').innerHTML = '<tr><td colspan="3" class="error">Failed to load summary. Tap Refresh.</td></tr>';
       }
     }
 
@@ -1054,6 +1072,12 @@
       });
     }
 
+    function isWebAppMode() {
+      // Detect if running as iOS homescreen web app
+      return window.navigator.standalone === true || 
+             window.matchMedia('(display-mode: standalone)').matches;
+    }
+    
     function setRadarOverlay(type) {
       const buttons = document.querySelectorAll('.radar-controls button');
       buttons.forEach(btn => btn.classList.remove('active'));
@@ -1082,14 +1106,34 @@
         existingIframe.remove();
       }
       
-      // Create fresh iframe — this forces mobile Safari to render it
+      // Remove existing fallback link if present
+      const existingLink = document.getElementById('radarFallback');
+      if (existingLink) {
+        existingLink.remove();
+      }
+      
+      const windyUrl = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&zoom=6&overlay=' + overlay + '&level=surface&lat=' + currentLat + '&lon=' + currentLon;
+      
+      // In web app mode, iframes are often blocked. Show a direct link instead.
+      if (isWebAppMode()) {
+        const link = document.createElement('a');
+        link.id = 'radarFallback';
+        link.href = 'https://www.windy.com/?' + overlay + ',' + currentLat + ',' + currentLon + ',6';
+        link.target = '_blank';
+        link.style.cssText = 'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#b8956a;font-size:16px;text-decoration:none;gap:12px;';
+        link.innerHTML = '<div style="font-size:32px;">🌧️</div><div>Tap to open ' + overlay + ' radar in Windy</div><div style="font-size:12px;color:#7a8a6a;">Web app mode blocks embedded radar</div>';
+        container.appendChild(link);
+        return;
+      }
+      
+      // Normal browser mode: create iframe
       const iframe = document.createElement('iframe');
       iframe.id = 'radarFrame';
       iframe.frameBorder = '0';
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.border = 'none';
-      iframe.src = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&zoom=6&overlay=' + overlay + '&level=surface&lat=' + currentLat + '&lon=' + currentLon;
+      iframe.src = windyUrl;
       
       container.appendChild(iframe);
     }
@@ -1157,6 +1201,12 @@
     // Mobile Safari local file iframe fix: simulate button press after delay
     // This tricks the browser into treating it as a user-initiated action
     function initRadar() {
+      // Skip synthetic clicks in web app mode — it won't help and wastes time
+      if (isWebAppMode()) {
+        setRadarOverlay('radar');
+        return;
+      }
+      
       const btn = document.getElementById('btn-radar');
       if (btn) {
         // Create and dispatch a synthetic click event
@@ -1169,16 +1219,21 @@
       }
     }
     
-    // Try multiple times with increasing delays
-    setTimeout(initRadar, 500);
-    setTimeout(initRadar, 1500);
-    setTimeout(initRadar, 3000);
-    
-    // Also try when user first touches the screen
-    document.addEventListener('touchstart', function onFirstTouch() {
-      initRadar();
-      document.removeEventListener('touchstart', onFirstTouch);
-    }, { once: true });
+    // Try multiple times with increasing delays (normal browser only)
+    if (!isWebAppMode()) {
+      setTimeout(initRadar, 500);
+      setTimeout(initRadar, 1500);
+      setTimeout(initRadar, 3000);
+      
+      // Also try when user first touches the screen
+      document.addEventListener('touchstart', function onFirstTouch() {
+        initRadar();
+        document.removeEventListener('touchstart', onFirstTouch);
+      }, { once: true });
+    } else {
+      // Web app mode: just set the fallback link immediately
+      setTimeout(function() { setRadarOverlay('radar'); }, 300);
+    }
     
     getUserLocation();
 
