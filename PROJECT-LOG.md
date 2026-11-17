@@ -73,6 +73,10 @@
 | NOAA | `api.weather.gov/alerts/active` | US weather alerts | No |
 | Windy | `embed.windy.com/embed.html` | Radar iframe | No |
 
+### GitHub Pages CDN caching
+**Problem**: After pushing, the live site still shows old code. Query-string cache busters (`?t=123`) do not work.
+**Solution**: GitHub Pages caches aggressively at the CDN level. Wait 2-5 minutes, then delete and re-add the homescreen shortcut on your phone. The commit is confirmed via `curl -s https://api.github.com/repos/jlegrand90/weather-dashboard/commits?per_page=1 | grep -o '"message": "[^"]*"'`.
+
 ---
 
 ## Workflow
