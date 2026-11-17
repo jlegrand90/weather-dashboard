@@ -988,6 +988,17 @@
       const sunrise = daily.sunrise[0] ? new Date(daily.sunrise[0]).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '--';
       const sunset = daily.sunset[0] ? new Date(daily.sunset[0]).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '--';
       
+      // Calculate day length from sunrise and sunset
+      let dayLength = '--';
+      if (daily.sunrise[0] && daily.sunset[0]) {
+        const rise = new Date(daily.sunrise[0]);
+        const set = new Date(daily.sunset[0]);
+        const diffMs = set - rise;
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const mins = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        dayLength = hours + 'h ' + mins + 'm';
+      }
+      
       document.getElementById('sunMoon').innerHTML = `
         <div class="sun-moon-item">
           <div class="sun-moon-label">Sunrise</div>
@@ -1004,7 +1015,7 @@
         </div>
         <div class="sun-moon-item">
           <div class="sun-moon-label">Day Length</div>
-          <div class="sun-moon-value">--</div>
+          <div class="sun-moon-value">☀️ ${dayLength}</div>
         </div>
       `;
     }
