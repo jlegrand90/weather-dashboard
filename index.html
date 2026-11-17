@@ -870,7 +870,7 @@
       if (aqiData) {
         const aqi = aqiData.us_aqi;
         if (aqi <= 50) {
-          aqiStatus = '<span class="status-good">Good (${aqi} AQI)</span>';
+          aqiStatus = '<span class="status-good">Good (' + aqi + ' AQI)</span>';
           aqiDetails = 'Air quality is satisfactory';
         } else if (aqi <= 100) {
           aqiStatus = `<span class="status-info">Moderate (${aqi} AQI)</span>`;
